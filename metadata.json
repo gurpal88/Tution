@@ -1,0 +1,6 @@
+{
+  "name": "Tuition Manager",
+  "description": "Complete tuition center management app for fee updates, parent messages, attendance tracking, homework, and test scores.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
