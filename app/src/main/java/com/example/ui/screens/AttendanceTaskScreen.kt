@@ -1,16 +1,23 @@
 package com.example.ui.screens
 
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -22,16 +29,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.data.*
-import com.example.ui.theme.FeeOverdueRed
-import com.example.ui.theme.FeePaidGreen
-import com.example.ui.theme.FeePendingAmber
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.example.ui.components.CircularScoreBadge
+import com.example.ui.components.EmptyStateCard
+import com.example.ui.components.StudentAvatarBadge
+import com.example.ui.theme.LocalTuitionStatusPalette
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,24 +58,30 @@ fun AttendanceTaskScreen(
     var showAddTaskDialog by remember { mutableStateOf(false) }
     var showAddTestScoreDialog by remember { mutableStateOf(false) }
 
+    val openTasksCount = tasks.count { !it.isCompleted }
+
     Scaffold(
+        contentWindowInsets = WindowInsets(0.dp),
+        containerColor = Color.Transparent,
         floatingActionButton = {
             if (selectedTab == 1) {
                 ExtendedFloatingActionButton(
                     onClick = { showAddTaskDialog = true },
                     icon = { Icon(Icons.Default.AddTask, contentDescription = null) },
-                    text = { Text("Add Task / Homework") },
+                    text = { Text("Add Task") },
                     containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = Color.White,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = RoundedCornerShape(18.dp),
                     modifier = Modifier.testTag("fab_add_task")
                 )
             } else if (selectedTab == 2) {
                 ExtendedFloatingActionButton(
                     onClick = { showAddTestScoreDialog = true },
                     icon = { Icon(Icons.Default.Grade, contentDescription = null) },
-                    text = { Text("Enter Test Score") },
+                    text = { Text("Add Score") },
                     containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = Color.White,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = RoundedCornerShape(18.dp),
                     modifier = Modifier.testTag("fab_add_test_score")
                 )
             }
@@ -81,55 +92,102 @@ fun AttendanceTaskScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Tab Header
-            PrimaryTabRow(
-                selectedTabIndex = selectedTab,
+            Spacer(modifier = Modifier.height(2.dp))
+
+            // Modern Pill Segmented Switcher
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    text = { Text("Attendance") },
-                    icon = { Icon(Icons.Outlined.HowToReg, contentDescription = null) }
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    text = { Text("Homework (${tasks.count { !it.isCompleted }})") },
-                    icon = { Icon(Icons.Outlined.Assignment, contentDescription = null) }
-                )
-                Tab(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    text = { Text("Test Marks") },
-                    icon = { Icon(Icons.Outlined.Quiz, contentDescription = null) }
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val tabItems = listOf(
+                        Triple(0, "Attendance", Icons.Outlined.HowToReg),
+                        Triple(1, "Tasks ($openTasksCount)", Icons.AutoMirrored.Outlined.Assignment),
+                        Triple(2, "Marks", Icons.Outlined.Quiz)
+                    )
+                    tabItems.forEach { (idx, label, icon) ->
+                        val selected = selectedTab == idx
+                        val bgColor by animateColorAsState(
+                            targetValue = if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
+                            animationSpec = tween(180),
+                            label = "tabBg"
+                        )
+                        val fgColor by animateColorAsState(
+                            targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            animationSpec = tween(180),
+                            label = "tabFg"
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = bgColor,
+                            shadowElevation = if (selected) 1.dp else 0.dp,
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 44.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable { selectedTab = idx }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = null,
+                                    tint = fgColor,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                    color = fgColor,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
-            when (selectedTab) {
-                0 -> AttendanceTabContent(
-                    students = students,
-                    selectedDate = selectedDate,
-                    onDateSelected = onDateSelected,
-                    attendanceRecords = attendanceRecords,
-                    onSaveRecord = onSaveAttendanceRecord,
-                    onMarkAllPresent = onMarkAllPresent
-                )
-                1 -> TasksTabContent(
-                    tasks = tasks,
-                    onToggleTask = onToggleTask,
-                    onDeleteTask = onDeleteTask
-                )
-                2 -> TestMarksTabContent(
-                    testScores = testScores
-                )
+            AnimatedContent(
+                targetState = selectedTab,
+                label = "attendanceTabSwitch",
+                modifier = Modifier.weight(1f)
+            ) { tab ->
+                when (tab) {
+                    0 -> AttendanceTabContent(
+                        students = students,
+                        selectedDate = selectedDate,
+                        onDateSelected = onDateSelected,
+                        attendanceRecords = attendanceRecords,
+                        onSaveRecord = onSaveAttendanceRecord,
+                        onMarkAllPresent = onMarkAllPresent
+                    )
+                    1 -> TasksTabContent(
+                        tasks = tasks,
+                        onToggleTask = onToggleTask,
+                        onDeleteTask = onDeleteTask
+                    )
+                    else -> TestMarksTabContent(
+                        testScores = testScores
+                    )
+                }
             }
         }
     }
 
-    // Modal Dialog: Add Task
     if (showAddTaskDialog) {
         AddTaskDialog(
             onDismiss = { showAddTaskDialog = false },
@@ -140,7 +198,6 @@ fun AttendanceTaskScreen(
         )
     }
 
-    // Modal Dialog: Enter Test Score
     if (showAddTestScoreDialog) {
         AddTestScoreDialog(
             students = students,
@@ -162,28 +219,36 @@ fun AttendanceTabContent(
     onSaveRecord: (student: Student, status: AttendanceStatus, remarks: String) -> Unit,
     onMarkAllPresent: () -> Unit
 ) {
+    val palette = LocalTuitionStatusPalette.current
     val attendanceMap = remember(attendanceRecords) {
         attendanceRecords.associateBy { it.studentId }
     }
 
     val presentCount = attendanceRecords.count { it.status == AttendanceStatus.PRESENT.name }
     val absentCount = attendanceRecords.count { it.status == AttendanceStatus.ABSENT.name }
+    val lateCount = attendanceRecords.count { it.status == AttendanceStatus.LATE.name }
+
+    val presentRatio by animateFloatAsState(
+        targetValue = if (students.isNotEmpty()) presentCount.toFloat() / students.size.toFloat() else 0f,
+        animationSpec = tween(350),
+        label = "attProgress"
+    )
 
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(bottom = 80.dp)
+        contentPadding = PaddingValues(bottom = 84.dp)
     ) {
-        // Date Selector & Summary Header
+        // Attendance Summary Card
         item {
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = CardDefaults.outlinedCardBorder(),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -192,99 +257,225 @@ fun AttendanceTabContent(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Icon(Icons.Default.CalendarToday, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Text(
-                                text = "Date: $selectedDate",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.size(38.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.CalendarToday,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                            Column {
+                                Text(
+                                    text = "Roll Call",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = selectedDate,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
 
                         Button(
                             onClick = onMarkAllPresent,
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                            modifier = Modifier.heightIn(min = 42.dp)
                         ) {
-                            Text("Mark All Present", fontSize = 12.sp)
+                            Icon(Icons.Default.DoneAll, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("All Present", style = MaterialTheme.typography.labelMedium)
                         }
                     }
 
+                    LinearProgressIndicator(
+                        progress = { presentRatio },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(50)),
+                        color = palette.paid,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("Present: $presentCount", color = FeePaidGreen, fontWeight = FontWeight.Bold)
-                        Text("Absent: $absentCount", color = FeeOverdueRed, fontWeight = FontWeight.Bold)
-                        Text("Total: ${students.size}", fontWeight = FontWeight.SemiBold)
+                        AttendanceStatPill(
+                            label = "Present",
+                            value = "$presentCount",
+                            fg = palette.paid,
+                            bg = palette.paidContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                        AttendanceStatPill(
+                            label = "Absent",
+                            value = "$absentCount",
+                            fg = palette.overdue,
+                            bg = palette.overdueContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                        AttendanceStatPill(
+                            label = "Late",
+                            value = "$lateCount",
+                            fg = palette.pending,
+                            bg = palette.pendingContainer,
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
             }
         }
 
-        items(students, key = { it.id }) { student ->
-            val record = attendanceMap[student.id]
-            val currentStatus = record?.status ?: AttendanceStatus.PRESENT.name
+        if (students.isEmpty()) {
+            item {
+                EmptyStateCard(
+                    icon = Icons.Outlined.HowToReg,
+                    title = "No Students Enrolled",
+                    subtitle = "Add students in the Fees & Roster tab to track daily attendance."
+                )
+            }
+        } else {
+            items(students, key = { it.id }) { student ->
+                val record = attendanceMap[student.id]
+                val currentStatus = record?.status ?: AttendanceStatus.PRESENT.name
 
-            Card(
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = CardDefaults.outlinedCardBorder(),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = student.name,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = student.gradeClass,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            StudentAvatarBadge(name = student.name, size = 42.dp)
+                            Column {
+                                Text(
+                                    text = student.name,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = student.gradeClass,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        FilterChip(
-                            selected = currentStatus == AttendanceStatus.PRESENT.name,
-                            onClick = { onSaveRecord(student, AttendanceStatus.PRESENT, "") },
-                            label = { Text("P") },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = FeePaidGreen,
-                                selectedLabelColor = Color.White
-                            ),
-                            modifier = Modifier.width(44.dp)
-                        )
-                        FilterChip(
-                            selected = currentStatus == AttendanceStatus.ABSENT.name,
-                            onClick = { onSaveRecord(student, AttendanceStatus.ABSENT, "") },
-                            label = { Text("A") },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = FeeOverdueRed,
-                                selectedLabelColor = Color.White
-                            ),
-                            modifier = Modifier.width(44.dp)
-                        )
-                        FilterChip(
-                            selected = currentStatus == AttendanceStatus.LATE.name,
-                            onClick = { onSaveRecord(student, AttendanceStatus.LATE, "") },
-                            label = { Text("L") },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = FeePendingAmber,
-                                selectedLabelColor = Color.White
-                            ),
-                            modifier = Modifier.width(44.dp)
-                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            AttendanceTogglePill(
+                                letter = "P",
+                                selected = currentStatus == AttendanceStatus.PRESENT.name,
+                                activeColor = palette.paid,
+                                activeBg = palette.paidContainer,
+                                onClick = { onSaveRecord(student, AttendanceStatus.PRESENT, "") }
+                            )
+                            AttendanceTogglePill(
+                                letter = "A",
+                                selected = currentStatus == AttendanceStatus.ABSENT.name,
+                                activeColor = palette.overdue,
+                                activeBg = palette.overdueContainer,
+                                onClick = { onSaveRecord(student, AttendanceStatus.ABSENT, "") }
+                            )
+                            AttendanceTogglePill(
+                                letter = "L",
+                                selected = currentStatus == AttendanceStatus.LATE.name,
+                                activeColor = palette.pending,
+                                activeBg = palette.pendingContainer,
+                                onClick = { onSaveRecord(student, AttendanceStatus.LATE, "") }
+                            )
+                        }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun AttendanceStatPill(
+    label: String,
+    value: String,
+    fg: Color,
+    bg: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = bg,
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "$value ",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = fg
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = fg
+            )
+        }
+    }
+}
+
+@Composable
+private fun AttendanceTogglePill(
+    letter: String,
+    selected: Boolean,
+    activeColor: Color,
+    activeBg: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) activeColor else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        border = if (selected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier
+            .size(44.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = letter,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -295,71 +486,109 @@ fun TasksTabContent(
     onToggleTask: (taskId: Int, isCompleted: Boolean) -> Unit,
     onDeleteTask: (TeacherTask) -> Unit
 ) {
+    val palette = LocalTuitionStatusPalette.current
     if (tasks.isEmpty()) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            Text("No teacher tasks or homework assignments added yet.")
+            EmptyStateCard(
+                icon = Icons.AutoMirrored.Outlined.Assignment,
+                title = "No Homework or Tasks",
+                subtitle = "Tap Add Task below to assign homework or schedule class prep."
+            )
         }
     } else {
         LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(bottom = 80.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(bottom = 88.dp)
         ) {
             items(tasks, key = { it.id }) { task ->
                 Card(
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = if (task.isCompleted)
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
                         else
                             MaterialTheme.colorScheme.surface
                     ),
-                    border = CardDefaults.outlinedCardBorder(),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Checkbox(
                             checked = task.isCompleted,
                             onCheckedChange = { onToggleTask(task.id, it) }
                         )
 
-                        Column(modifier = Modifier.weight(1f)) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Text(
                                     text = task.title,
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+                                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                                    color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f, fill = false)
                                 )
-                                AssistChip(
-                                    onClick = {},
-                                    label = { Text(task.category, fontSize = 10.sp) },
-                                    modifier = Modifier.height(22.dp)
+                                Surface(
+                                    shape = RoundedCornerShape(50),
+                                    color = MaterialTheme.colorScheme.primaryContainer
+                                ) {
+                                    Text(
+                                        text = task.category,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            if (task.description.isNotBlank()) {
+                                Text(
+                                    text = task.description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Text(
-                                text = task.description,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "Subject: ${task.subject} • Batch: ${task.batch} • Due: ${task.dueDate}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant
+                                ) {
+                                    Text(
+                                        text = "${task.subject} • ${task.batch}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                                Text(
+                                    text = "Due: ${task.dueDate}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
                         }
 
                         IconButton(onClick = { onDeleteTask(task) }) {
-                            Icon(Icons.Default.DeleteOutline, contentDescription = "Delete Task", tint = FeeOverdueRed)
+                            Icon(
+                                Icons.Outlined.DeleteOutline,
+                                contentDescription = "Delete Task",
+                                tint = palette.overdue
+                            )
                         }
                     }
                 }
@@ -370,76 +599,92 @@ fun TasksTabContent(
 
 @Composable
 fun TestMarksTabContent(testScores: List<TestScore>) {
+    val palette = LocalTuitionStatusPalette.current
     if (testScores.isEmpty()) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            Text("No test scores recorded yet.")
+            EmptyStateCard(
+                icon = Icons.Outlined.Quiz,
+                title = "No Test Marks Recorded",
+                subtitle = "Tap Add Score below to record assessment marks and generate grades."
+            )
         }
     } else {
         LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(bottom = 80.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(bottom = 88.dp)
         ) {
             items(testScores, key = { it.id }) { score ->
-                val percentage = (score.scoreObtained / score.maxScore) * 100
+                val percentage = if (score.maxScore > 0) (score.scoreObtained / score.maxScore) * 100 else 0.0
                 val (gradeText, gradeColor) = when {
-                    percentage >= 90 -> "A+" to FeePaidGreen
-                    percentage >= 80 -> "A" to FeePaidGreen
-                    percentage >= 70 -> "B" to FeePendingAmber
-                    percentage >= 60 -> "C" to FeePendingAmber
-                    else -> "D" to FeeOverdueRed
+                    percentage >= 90 -> "A+" to palette.paid
+                    percentage >= 80 -> "A" to palette.paid
+                    percentage >= 70 -> "B" to palette.pending
+                    percentage >= 60 -> "C" to palette.pending
+                    else -> "D" to palette.overdue
                 }
 
                 Card(
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    border = CardDefaults.outlinedCardBorder(),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
-                        modifier = Modifier.padding(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = score.studentName,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            CircularScoreBadge(
+                                percentage = percentage.toFloat(),
+                                color = gradeColor,
+                                gradeText = gradeText
                             )
-                            Text(
-                                text = "${score.testTitle} • ${score.subject}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "Date: ${score.testDate} ${if (score.remarks.isNotBlank()) "• Note: " + score.remarks else ""}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(
+                                    text = score.studentName,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "${score.testTitle} • ${score.subject}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "${score.testDate}" + if (score.remarks.isNotBlank()) " • ${score.remarks}" else "",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
 
                         Column(horizontalAlignment = Alignment.End) {
                             Text(
-                                text = "${score.scoreObtained.toInt()} / ${score.maxScore.toInt()}",
+                                text = "${score.scoreObtained.toInt()}/${score.maxScore.toInt()}",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = gradeColor.copy(alpha = 0.15f)
-                            ) {
-                                Text(
-                                    text = "Grade $gradeText (${percentage.toInt()}%)",
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = gradeColor
-                                )
-                            }
+                            Text(
+                                text = "${percentage.toInt()}%",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = gradeColor
+                            )
                         }
                     }
                 }
@@ -448,7 +693,6 @@ fun TestMarksTabContent(testScores: List<TestScore>) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddTaskDialog(
     onDismiss: () -> Unit,
@@ -461,22 +705,59 @@ fun AddTaskDialog(
     var dueDate by remember { mutableStateOf("Tomorrow") }
     var category by remember { mutableStateOf("HOMEWORK") }
 
+    val taskCategories = listOf("HOMEWORK", "CLASS_PREP", "TEST_PREP")
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Create Homework or Task") },
+        shape = RoundedCornerShape(24.dp),
+        icon = {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.AddTask, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+        },
+        title = {
+            Text(
+                "Create Homework / Task",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(taskCategories) { cat ->
+                        FilterChip(
+                            selected = category == cat,
+                            onClick = { category = cat },
+                            label = { Text(cat.replace("_", " ")) },
+                            shape = RoundedCornerShape(50)
+                        )
+                    }
+                }
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Task Title") },
+                    label = { Text("Task Title *") },
                     singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = desc,
                     onValueChange = { desc = it },
-                    label = { Text("Task Instructions / Details") },
+                    label = { Text("Instructions / Details") },
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
@@ -484,6 +765,7 @@ fun AddTaskDialog(
                     onValueChange = { subject = it },
                     label = { Text("Subject") },
                     singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
@@ -491,6 +773,7 @@ fun AddTaskDialog(
                     onValueChange = { batch = it },
                     label = { Text("Target Batch") },
                     singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
@@ -498,6 +781,7 @@ fun AddTaskDialog(
                     onValueChange = { dueDate = it },
                     label = { Text("Due Date") },
                     singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -508,7 +792,9 @@ fun AddTaskDialog(
                     if (title.isNotBlank()) {
                         onConfirm(title, desc, subject, batch, dueDate, category)
                     }
-                }
+                },
+                enabled = title.isNotBlank(),
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Text("Save Task")
             }
@@ -536,9 +822,32 @@ fun AddTestScoreDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Record Student Test Score") },
+        shape = RoundedCornerShape(24.dp),
+        icon = {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Grade, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                }
+            }
+        },
+        title = {
+            Text(
+                "Record Test Score",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
                 ExposedDropdownMenuBox(
                     expanded = studentDropdownExpanded,
                     onExpandedChange = { studentDropdownExpanded = !studentDropdownExpanded }
@@ -549,7 +858,10 @@ fun AddTestScoreDialog(
                         readOnly = true,
                         label = { Text("Student") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = studentDropdownExpanded) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                            .fillMaxWidth()
                     )
                     ExposedDropdownMenu(
                         expanded = studentDropdownExpanded,
@@ -572,6 +884,7 @@ fun AddTestScoreDialog(
                     onValueChange = { testTitle = it },
                     label = { Text("Test Name") },
                     singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
@@ -579,21 +892,24 @@ fun AddTestScoreDialog(
                     onValueChange = { subject = it },
                     label = { Text("Subject") },
                     singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(
                         value = scoreText,
                         onValueChange = { scoreText = it },
                         label = { Text("Score") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.weight(1f)
                     )
                     OutlinedTextField(
                         value = maxScoreText,
                         onValueChange = { maxScoreText = it },
-                        label = { Text("Max Score") },
+                        label = { Text("Max") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -602,6 +918,7 @@ fun AddTestScoreDialog(
                     onValueChange = { remarks = it },
                     label = { Text("Remarks") },
                     singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -614,9 +931,11 @@ fun AddTestScoreDialog(
                         val maxScoreVal = maxScoreText.toDoubleOrNull() ?: 100.0
                         onConfirm(student, testTitle, subject, scoreVal, maxScoreVal, remarks)
                     }
-                }
+                },
+                enabled = selectedStudent != null && testTitle.isNotBlank(),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Save Test Score")
+                Text("Save Score")
             }
         },
         dismissButton = {

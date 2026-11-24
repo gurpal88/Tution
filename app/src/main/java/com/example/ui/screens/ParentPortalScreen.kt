@@ -1,33 +1,33 @@
 package com.example.ui.screens
 
-import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.outlined.Campaign
+import androidx.compose.material.icons.outlined.Quiz
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.data.*
-import com.example.ui.theme.FeeOverdueRed
-import com.example.ui.theme.FeePaidGreen
-import com.example.ui.theme.FeePendingAmber
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.example.ui.components.*
+import com.example.ui.theme.LocalTuitionStatusPalette
+import com.example.ui.theme.SapphireDeep
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,46 +40,69 @@ fun ParentPortalScreen(
     attendanceRecords: List<AttendanceRecord>,
     testScores: List<TestScore>
 ) {
+    val palette = LocalTuitionStatusPalette.current
     var studentDropdownExpanded by remember { mutableStateOf(false) }
 
     val activeStudent = selectedStudent ?: students.firstOrNull()
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(top = 12.dp, bottom = 32.dp)
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        // Child Selection Card
+        // Parent Portal Gradient Header + Child Selector
         item {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                ),
+            val portalGradient = Brush.linearGradient(
+                colors = listOf(Color(0xFF0F4C5C), SapphireDeep)
+            )
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(portalGradient)
+                    .drawBehind {
+                        drawCircle(
+                            color = Color.White.copy(alpha = 0.07f),
+                            radius = size.width * 0.35f,
+                            center = Offset(size.width * 0.92f, size.height * 0.14f)
+                        )
+                    }
                     .testTag("parent_child_selector_card")
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.FamilyRestroom,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "Parent Portal View",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Surface(
+                            shape = CircleShape,
+                            color = Color.White.copy(alpha = 0.16f),
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.FamilyRestroom,
+                                    contentDescription = null,
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                        Column {
+                            Text(
+                                text = "Parent Portal",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Track fees, attendance, notices & test progress",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.78f)
+                            )
+                        }
                     }
 
                     if (students.isNotEmpty()) {
@@ -88,15 +111,25 @@ fun ParentPortalScreen(
                             onExpandedChange = { studentDropdownExpanded = !studentDropdownExpanded }
                         ) {
                             OutlinedTextField(
-                                value = activeStudent?.let { "${it.name} (${it.gradeClass})" } ?: "Select Child",
+                                value = activeStudent?.let { "${it.name} • ${it.gradeClass}" } ?: "Select Child",
                                 onValueChange = {},
                                 readOnly = true,
-                                label = { Text("Viewing Details For Child") },
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = studentDropdownExpanded) },
+                                label = { Text("Viewing Student", color = Color.White.copy(alpha = 0.8f)) },
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = studentDropdownExpanded)
+                                },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    focusedBorderColor = Color.White.copy(alpha = 0.7f),
+                                    unfocusedBorderColor = Color.White.copy(alpha = 0.4f),
+                                    focusedTrailingIconColor = Color.White,
+                                    unfocusedTrailingIconColor = Color.White
+                                ),
                                 modifier = Modifier
-                                    .menuAnchor()
+                                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                                     .fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp)
+                                shape = RoundedCornerShape(14.dp)
                             )
                             ExposedDropdownMenu(
                                 expanded = studentDropdownExpanded,
@@ -104,7 +137,22 @@ fun ParentPortalScreen(
                             ) {
                                 students.forEach { s ->
                                     DropdownMenuItem(
-                                        text = { Text("${s.name} • ${s.gradeClass}") },
+                                        text = {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                            ) {
+                                                StudentAvatarBadge(name = s.name, size = 30.dp)
+                                                Column {
+                                                    Text(s.name, fontWeight = FontWeight.SemiBold)
+                                                    Text(
+                                                        s.gradeClass,
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        },
                                         onClick = {
                                             onSelectStudent(s)
                                             studentDropdownExpanded = false
@@ -118,30 +166,39 @@ fun ParentPortalScreen(
             }
         }
 
-        activeStudent?.let { student ->
+        if (activeStudent == null) {
+            item {
+                EmptyStateCard(
+                    icon = Icons.Default.School,
+                    title = "No Student Profiles Found",
+                    subtitle = "Switch to Teacher Mode to enroll students first."
+                )
+            }
+        } else {
+            val student = activeStudent
             val studentReceipts = receipts.filter { it.studentId == student.id }
             val studentMessages = messages.filter { it.studentId == student.id || it.isBroadcast }
             val studentAttendance = attendanceRecords.filter { it.studentId == student.id }
             val studentScores = testScores.filter { it.studentId == student.id }
 
-            // Fee Status Overview Card
-            item {
-                val statusEnum = try { FeeStatus.valueOf(student.feeStatus) } catch (e: Exception) { FeeStatus.PENDING }
-                val (statusColor, statusBg, statusTitle) = when (statusEnum) {
-                    FeeStatus.PAID -> Triple(FeePaidGreen, MaterialTheme.colorScheme.surface, "Fee Status: Paid")
-                    FeeStatus.PENDING -> Triple(FeePendingAmber, MaterialTheme.colorScheme.surface, "Fee Status: Pending")
-                    FeeStatus.OVERDUE -> Triple(FeeOverdueRed, MaterialTheme.colorScheme.surface, "Fee Status: Overdue")
-                }
+            val statusEnum = try {
+                FeeStatus.valueOf(student.feeStatus)
+            } catch (e: Exception) {
+                FeeStatus.PENDING
+            }
+            val todayAttendance = studentAttendance.firstOrNull()?.status ?: "Not Marked"
 
+            // Student Quick Snapshot Card
+            item {
                 Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = statusBg),
-                    border = CardDefaults.outlinedCardBorder(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -150,129 +207,82 @@ fun ParentPortalScreen(
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.weight(1f)
                             ) {
-                                Icon(Icons.Default.Payments, contentDescription = null, tint = statusColor)
-                                Text(
-                                    text = statusTitle,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = statusColor
-                                )
-                            }
-
-                            AssistChip(
-                                onClick = {},
-                                label = { Text("Monthly: ₹${student.monthlyFee.toInt()}") }
-                            )
-                        }
-
-                        Text(
-                            text = "Due Date: ${student.dueDate} • Batch: ${student.batchTiming}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            // Fee Receipts
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "Digital Fee Receipts (${studentReceipts.size})",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    if (studentReceipts.isEmpty()) {
-                        Text(
-                            text = "No fee receipt history found for this month.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    } else {
-                        studentReceipts.forEach { receipt ->
-                            Card(
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                border = CardDefaults.outlinedCardBorder(),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = "Receipt ${receipt.receiptNo}",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = "${receipt.monthYear} • ${receipt.paymentMode}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-
+                                StudentAvatarBadge(name = student.name, size = 48.dp)
+                                Column {
                                     Text(
-                                        text = "₹${receipt.amountPaid.toInt()}",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = FeePaidGreen
+                                        text = student.name,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = student.batchTiming,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
+                            StatusPillBadge(status = statusEnum)
                         }
-                    }
-                }
-            }
 
-            // Teacher Messages / Announcements
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "Teacher Messages & Notices (${studentMessages.size})",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    if (studentMessages.isEmpty()) {
-                        Text(
-                            text = "No messages sent by teacher yet.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    } else {
-                        studentMessages.forEach { msg ->
-                            Card(
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Surface(
                                 shape = RoundedCornerShape(14.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                border = CardDefaults.outlinedCardBorder(),
-                                modifier = Modifier.fillMaxWidth()
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.weight(1f)
                             ) {
-                                Column(
-                                    modifier = Modifier.padding(14.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            text = msg.subject,
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        if (msg.isBroadcast) {
-                                            AssistChip(onClick = {}, label = { Text("Notice", fontSize = 10.sp) })
-                                        }
-                                    }
+                                Column(modifier = Modifier.padding(12.dp)) {
                                     Text(
-                                        text = msg.messageBody,
-                                        style = MaterialTheme.typography.bodySmall,
+                                        text = "Monthly Fee",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "₹${student.monthlyFee.toInt()}",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "Due ${student.dueDate}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(
+                                        text = "Attendance",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = todayAttendance,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = when (todayAttendance) {
+                                            AttendanceStatus.PRESENT.name -> palette.paid
+                                            AttendanceStatus.ABSENT.name -> palette.overdue
+                                            AttendanceStatus.LATE.name -> palette.pending
+                                            else -> MaterialTheme.colorScheme.onSurface
+                                        }
+                                    )
+                                    Text(
+                                        text = "Selected date",
+                                        style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
@@ -282,54 +292,166 @@ fun ParentPortalScreen(
                 }
             }
 
-            // Recent Test Performance
+            // Digital Fee Receipts
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "Child's Test Performance (${studentScores.size})",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                    SectionHeader(
+                        title = "Digital Fee Receipts",
+                        badgeText = "${studentReceipts.size}"
                     )
 
-                    if (studentScores.isEmpty()) {
-                        Text(
-                            text = "No test scores published yet.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    if (studentReceipts.isEmpty()) {
+                        EmptyStateCard(
+                            icon = Icons.AutoMirrored.Filled.ReceiptLong,
+                            title = "No Receipts for This Period",
+                            subtitle = "Receipts appear here once fee payments are recorded by the teacher."
                         )
                     } else {
-                        studentScores.forEach { score ->
-                            val pct = (score.scoreObtained / score.maxScore) * 100
-                            Card(
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                border = CardDefaults.outlinedCardBorder(),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            studentReceipts.forEach { receipt ->
+                                TicketReceiptCard(receipt = receipt)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Teacher Messages & Notices
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SectionHeader(
+                        title = "Teacher Notices",
+                        badgeText = "${studentMessages.size}"
+                    )
+
+                    if (studentMessages.isEmpty()) {
+                        EmptyStateCard(
+                            icon = Icons.Outlined.Campaign,
+                            title = "No Notices Yet",
+                            subtitle = "Announcements and direct teacher updates will show up here."
+                        )
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            studentMessages.forEach { msg ->
+                                Card(
+                                    shape = RoundedCornerShape(18.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Column {
+                                    Column(
+                                        modifier = Modifier.padding(16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = msg.subject,
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            if (msg.isBroadcast) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(50),
+                                                    color = MaterialTheme.colorScheme.tertiaryContainer
+                                                ) {
+                                                    Text(
+                                                        text = "Broadcast",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.tertiary,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
                                         Text(
-                                            text = "${score.testTitle} (${score.subject})",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = "Date: ${score.testDate}",
+                                            text = msg.messageBody,
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
-                                    Text(
-                                        text = "${score.scoreObtained.toInt()}/${score.maxScore.toInt()} (${pct.toInt()}%)",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
+            // Child's Test Performance
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SectionHeader(
+                        title = "Test Performance",
+                        badgeText = "${studentScores.size}"
+                    )
+
+                    if (studentScores.isEmpty()) {
+                        EmptyStateCard(
+                            icon = Icons.Outlined.Quiz,
+                            title = "No Test Scores Published",
+                            subtitle = "Assessment results and grades will appear here once graded."
+                        )
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            studentScores.forEach { score ->
+                                val pct = if (score.maxScore > 0) (score.scoreObtained / score.maxScore) * 100 else 0.0
+                                val (gradeText, gradeColor) = when {
+                                    pct >= 90 -> "A+" to palette.paid
+                                    pct >= 80 -> "A" to palette.paid
+                                    pct >= 70 -> "B" to palette.pending
+                                    pct >= 60 -> "C" to palette.pending
+                                    else -> "D" to palette.overdue
+                                }
+
+                                Card(
+                                    shape = RoundedCornerShape(18.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(14.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            CircularScoreBadge(
+                                                percentage = pct.toFloat(),
+                                                color = gradeColor,
+                                                gradeText = gradeText
+                                            )
+                                            Column {
+                                                Text(
+                                                    text = "${score.testTitle} (${score.subject})",
+                                                    style = MaterialTheme.typography.titleSmall,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                Text(
+                                                    text = "Date: ${score.testDate}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+
+                                        Text(
+                                            text = "${score.scoreObtained.toInt()}/${score.maxScore.toInt()} (${pct.toInt()}%)",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -337,5 +459,7 @@ fun ParentPortalScreen(
                 }
             }
         }
+
+        item { Spacer(modifier = Modifier.height(12.dp)) }
     }
 }
