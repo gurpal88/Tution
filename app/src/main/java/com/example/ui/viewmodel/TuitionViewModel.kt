@@ -160,10 +160,11 @@ class TuitionViewModel(application: Application) : AndroidViewModel(application)
 
     // Attendance Date State
     private val _selectedAttendanceDate = MutableStateFlow(
-        SimpleDateFormat("yyyy-MM-DD", Locale.getDefault()).format(Date())
+        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
     )
     val selectedAttendanceDate: StateFlow<String> = _selectedAttendanceDate.asStateFlow()
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val attendanceForSelectedDate: StateFlow<List<AttendanceRecord>> = _selectedAttendanceDate
         .flatMapLatest { dateStr -> repository.getAttendanceForDate(dateStr) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

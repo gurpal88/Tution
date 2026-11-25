@@ -61,6 +61,9 @@ interface TuitionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAllAttendance(records: List<AttendanceRecord>)
 
+    @Query("DELETE FROM attendance_records WHERE studentId = :studentId AND dateString = :dateString")
+    suspend fun deleteAttendanceForStudentOnDate(studentId: Int, dateString: String)
+
     // --- Teacher Tasks / Homework ---
     @Query("SELECT * FROM teacher_tasks ORDER BY isCompleted ASC, id DESC")
     fun getAllTasks(): Flow<List<TeacherTask>>

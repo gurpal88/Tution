@@ -56,8 +56,12 @@ class TuitionRepository(private val dao: TuitionDao) {
     fun getAttendanceForDate(dateString: String): Flow<List<AttendanceRecord>> =
         dao.getAttendanceForDate(dateString)
 
-    suspend fun saveAttendance(records: List<AttendanceRecord>) =
+    suspend fun saveAttendance(records: List<AttendanceRecord>) {
+        records.forEach { record ->
+            dao.deleteAttendanceForStudentOnDate(record.studentId, record.dateString)
+        }
         dao.insertAllAttendance(records)
+    }
 
     suspend fun addTask(task: TeacherTask): Long =
         dao.insertTask(task)
