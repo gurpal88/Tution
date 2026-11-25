@@ -356,7 +356,8 @@ class TuitionViewModel(application: Application) : AndroidViewModel(application)
         subject: String,
         scoreObtained: Double,
         maxScore: Double,
-        remarks: String
+        remarks: String,
+        notifyParentPortal: Boolean = false
     ) {
         viewModelScope.launch {
             val todayDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
@@ -371,6 +372,57 @@ class TuitionViewModel(application: Application) : AndroidViewModel(application)
                 remarks = remarks
             )
             repository.addTestScore(score)
+            if (notifyParentPortal) {
+                val pct = if (maxScore > 0) ((scoreObtained / maxScore) * 100).toInt() else 0
+                val body = buildMarksReportText(score, student.parentName, pct)
+                sendParentMessage(
+                    student = student,
+                    subject = "Test Marks: $testTitle ($subject)",
+                    body = body,
+                    category = MessageCategory.TEST_RESULT,
+                    isBroadcast = false
+                )
+            }
+        }
+    }
+
+    fun buildMarksReportText(score: TestScore, parentName: String? = null, pctOverride: Int? = null): String {
+        val pct = pctOverride ?: if (score.maxScore > 0) ((score.scoreObtained / score.maxScore) * 100).toInt() else 0
+        val greeting = if (!parentName.isNullOrBlank()) "Dear $parentName," else "Dear Parent,"
+        return buildString {
+            append("$greeting\n")
+            append("${score.studentName}'s marks for ${score.testTitle} (${score.subject}) have been recorded:\n")
+            append("Score: ${score.scoreObtained.toInt()} / ${score.maxScore.toInt()} ($pct%)\n")
+            if (score.remarks.isNotBlank()) {
+                append("Remarks: ${score.remarks}\n")
+            }
+            append("Date: ${score.testDate}")
+        }
+    }
+
+    fun sendMarksToPortal(score: TestScore, student: Student?) {
+        val body = buildMarksReportText(score, student?.parentName)
+        sendParentMessage(
+            student = student,
+            subject = "Test Marks: ${score.testTitle} (${score.subject})",
+            body = body,
+            category = MessageCategory.TEST_RESULT,
+            isBroadcast = false
+        )
+        Toast.makeText(getApplication(), "Marks sent to Parent Portal", Toast.LENGTH_SHORT).show()
+    }
+
+    fun shareMarks(context: Context, score: TestScore, student: Student?) {
+        try {
+            val text = buildMarksReportText(score, student?.parentName)
+            val sendIntent = Intent().apply {
+                action = Intent.ACTION_SEND
+                putExtra(Intent.EXTRA_TEXT, text)
+                type = "text/plain"
+            }
+            context.startActivity(Intent.createChooser(sendIntent, "Send Student Marks"))
+        } catch (e: Exception) {
+            Toast.makeText(context, "Unable to share marks", Toast.LENGTH_SHORT).show()
         }
     }
 

@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.content.Context
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -17,6 +18,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -26,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -37,6 +41,8 @@ import com.example.ui.components.CircularScoreBadge
 import com.example.ui.components.EmptyStateCard
 import com.example.ui.components.StudentAvatarBadge
 import com.example.ui.theme.LocalTuitionStatusPalette
+import com.example.ui.theme.WhatsAppGreen
+import com.example.ui.theme.WhatsAppTint
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,11 +58,22 @@ fun AttendanceTaskScreen(
     onToggleTask: (taskId: Int, isCompleted: Boolean) -> Unit,
     onDeleteTask: (TeacherTask) -> Unit,
     testScores: List<TestScore>,
-    onAddTestScore: (student: Student, title: String, subject: String, score: Double, maxScore: Double, remarks: String) -> Unit
+    onAddTestScore: (student: Student, title: String, subject: String, score: Double, maxScore: Double, remarks: String, notifyParent: Boolean) -> Unit,
+    onSendMarksPortal: (score: TestScore, student: Student?) -> Unit,
+    onSendMarksWhatsApp: (context: Context, phone: String, message: String) -> Unit,
+    onSendMarksSms: (context: Context, phone: String, message: String) -> Unit,
+    onShareMarks: (context: Context, score: TestScore, student: Student?) -> Unit,
+    formatMarksMessage: (score: TestScore, student: Student?) -> String,
+    initialSubTab: Int = 0
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) } // 0 = Attendance, 1 = Homework/Tasks, 2 = Test Marks
+    val context = LocalContext.current
+    var selectedTab by remember { mutableIntStateOf(initialSubTab) } // 0 = Attendance, 1 = Tasks, 2 = Marks
     var showAddTaskDialog by remember { mutableStateOf(false) }
     var showAddTestScoreDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(initialSubTab) {
+        selectedTab = initialSubTab
+    }
 
     val openTasksCount = tasks.count { !it.isCompleted }
 
@@ -78,7 +95,7 @@ fun AttendanceTaskScreen(
                 ExtendedFloatingActionButton(
                     onClick = { showAddTestScoreDialog = true },
                     icon = { Icon(Icons.Default.Grade, contentDescription = null) },
-                    text = { Text("Add Score") },
+                    text = { Text("Record Marks") },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     shape = RoundedCornerShape(18.dp),
@@ -96,7 +113,7 @@ fun AttendanceTaskScreen(
         ) {
             Spacer(modifier = Modifier.height(2.dp))
 
-            // Modern Pill Segmented Switcher
+            // Minimal Pill Segmented Switcher
             Surface(
                 shape = RoundedCornerShape(18.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
@@ -111,7 +128,7 @@ fun AttendanceTaskScreen(
                     val tabItems = listOf(
                         Triple(0, "Attendance", Icons.Outlined.HowToReg),
                         Triple(1, "Tasks ($openTasksCount)", Icons.AutoMirrored.Outlined.Assignment),
-                        Triple(2, "Marks", Icons.Outlined.Quiz)
+                        Triple(2, "Marks (${testScores.size})", Icons.Outlined.Quiz)
                     )
                     tabItems.forEach { (idx, label, icon) ->
                         val selected = selectedTab == idx
@@ -181,7 +198,26 @@ fun AttendanceTaskScreen(
                         onDeleteTask = onDeleteTask
                     )
                     else -> TestMarksTabContent(
-                        testScores = testScores
+                        students = students,
+                        testScores = testScores,
+                        onSendPortal = { score, student -> onSendMarksPortal(score, student) },
+                        onSendWhatsApp = { score, student ->
+                            if (student != null && student.parentPhone.isNotBlank()) {
+                                onSendMarksWhatsApp(context, student.parentPhone, formatMarksMessage(score, student))
+                            } else {
+                                onShareMarks(context, score, student)
+                            }
+                        },
+                        onSendSms = { score, student ->
+                            if (student != null && student.parentPhone.isNotBlank()) {
+                                onSendMarksSms(context, student.parentPhone, formatMarksMessage(score, student))
+                            } else {
+                                onShareMarks(context, score, student)
+                            }
+                        },
+                        onShare = { score, student ->
+                            onShareMarks(context, score, student)
+                        }
                     )
                 }
             }
@@ -202,8 +238,8 @@ fun AttendanceTaskScreen(
         AddTestScoreDialog(
             students = students,
             onDismiss = { showAddTestScoreDialog = false },
-            onConfirm = { student, title, subject, score, maxScore, remarks ->
-                onAddTestScore(student, title, subject, score, maxScore, remarks)
+            onConfirm = { student, title, subject, score, maxScore, remarks, notifyParent ->
+                onAddTestScore(student, title, subject, score, maxScore, remarks, notifyParent)
                 showAddTestScoreDialog = false
             }
         )
@@ -238,7 +274,6 @@ fun AttendanceTabContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(bottom = 84.dp)
     ) {
-        // Attendance Summary Card
         item {
             Card(
                 shape = RoundedCornerShape(20.dp),
@@ -289,6 +324,7 @@ fun AttendanceTabContent(
 
                         Button(
                             onClick = onMarkAllPresent,
+                            enabled = students.isNotEmpty(),
                             shape = RoundedCornerShape(12.dp),
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                             modifier = Modifier.heightIn(min = 42.dp)
@@ -394,21 +430,18 @@ fun AttendanceTabContent(
                                 letter = "P",
                                 selected = currentStatus == AttendanceStatus.PRESENT.name,
                                 activeColor = palette.paid,
-                                activeBg = palette.paidContainer,
                                 onClick = { onSaveRecord(student, AttendanceStatus.PRESENT, "") }
                             )
                             AttendanceTogglePill(
                                 letter = "A",
                                 selected = currentStatus == AttendanceStatus.ABSENT.name,
                                 activeColor = palette.overdue,
-                                activeBg = palette.overdueContainer,
                                 onClick = { onSaveRecord(student, AttendanceStatus.ABSENT, "") }
                             )
                             AttendanceTogglePill(
                                 letter = "L",
                                 selected = currentStatus == AttendanceStatus.LATE.name,
                                 activeColor = palette.pending,
-                                activeBg = palette.pendingContainer,
                                 onClick = { onSaveRecord(student, AttendanceStatus.LATE, "") }
                             )
                         }
@@ -457,7 +490,6 @@ private fun AttendanceTogglePill(
     letter: String,
     selected: Boolean,
     activeColor: Color,
-    activeBg: Color,
     onClick: () -> Unit
 ) {
     Surface(
@@ -598,8 +630,17 @@ fun TasksTabContent(
 }
 
 @Composable
-fun TestMarksTabContent(testScores: List<TestScore>) {
+fun TestMarksTabContent(
+    students: List<Student>,
+    testScores: List<TestScore>,
+    onSendPortal: (TestScore, Student?) -> Unit,
+    onSendWhatsApp: (TestScore, Student?) -> Unit,
+    onSendSms: (TestScore, Student?) -> Unit,
+    onShare: (TestScore, Student?) -> Unit
+) {
     val palette = LocalTuitionStatusPalette.current
+    val studentLookup = remember(students) { students.associateBy { it.id } }
+
     if (testScores.isEmpty()) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -607,8 +648,8 @@ fun TestMarksTabContent(testScores: List<TestScore>) {
         ) {
             EmptyStateCard(
                 icon = Icons.Outlined.Quiz,
-                title = "No Test Marks Recorded",
-                subtitle = "Tap Add Score below to record assessment marks and generate grades."
+                title = "No Marks Recorded Yet",
+                subtitle = "Tap Record Marks below to enter test scores and send them directly to parents."
             )
         }
     } else {
@@ -617,6 +658,7 @@ fun TestMarksTabContent(testScores: List<TestScore>) {
             contentPadding = PaddingValues(bottom = 88.dp)
         ) {
             items(testScores, key = { it.id }) { score ->
+                val student = studentLookup[score.studentId]
                 val percentage = if (score.maxScore > 0) (score.scoreObtained / score.maxScore) * 100 else 0.0
                 val (gradeText, gradeColor) = when {
                     percentage >= 90 -> "A+" to palette.paid
@@ -632,59 +674,131 @@ fun TestMarksTabContent(testScores: List<TestScore>) {
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            CircularScoreBadge(
-                                percentage = percentage.toFloat(),
-                                color = gradeColor,
-                                gradeText = gradeText
-                            )
-                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                CircularScoreBadge(
+                                    percentage = percentage.toFloat(),
+                                    color = gradeColor,
+                                    gradeText = gradeText
+                                )
+                                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Text(
+                                        text = score.studentName,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "${score.testTitle} • ${score.subject}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "${score.testDate}" + if (score.remarks.isNotBlank()) " • ${score.remarks}" else "",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+
+                            Column(horizontalAlignment = Alignment.End) {
                                 Text(
-                                    text = score.studentName,
-                                    style = MaterialTheme.typography.titleSmall,
+                                    text = "${score.scoreObtained.toInt()}/${score.maxScore.toInt()}",
+                                    style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                                 Text(
-                                    text = "${score.testTitle} • ${score.subject}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = "${score.testDate}" + if (score.remarks.isNotBlank()) " • ${score.remarks}" else "",
+                                    text = "${percentage.toInt()}%",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    fontWeight = FontWeight.Bold,
+                                    color = gradeColor
                                 )
                             }
                         }
 
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                text = "${score.scoreObtained.toInt()}/${score.maxScore.toInt()}",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = "${percentage.toInt()}%",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = gradeColor
-                            )
+                        // Send Marks Action Bar
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            FilledTonalButton(
+                                onClick = { onSendPortal(score, student) },
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 40.dp)
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Send to Portal", style = MaterialTheme.typography.labelMedium)
+                            }
+
+                            IconButton(
+                                onClick = { onSendWhatsApp(score, student) },
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(WhatsAppTint.copy(alpha = 0.14f))
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.Chat,
+                                    contentDescription = "Send Marks via WhatsApp",
+                                    tint = WhatsAppGreen,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+
+                            IconButton(
+                                onClick = { onSendSms(score, student) },
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f))
+                            ) {
+                                Icon(
+                                    Icons.Default.Sms,
+                                    contentDescription = "Send Marks via SMS",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+
+                            IconButton(
+                                onClick = { onShare(score, student) },
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                Icon(
+                                    Icons.Default.Share,
+                                    contentDescription = "Share Marks",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -810,7 +924,7 @@ fun AddTaskDialog(
 fun AddTestScoreDialog(
     students: List<Student>,
     onDismiss: () -> Unit,
-    onConfirm: (student: Student, title: String, subject: String, score: Double, maxScore: Double, remarks: String) -> Unit
+    onConfirm: (student: Student, title: String, subject: String, score: Double, maxScore: Double, remarks: String, notifyParent: Boolean) -> Unit
 ) {
     var selectedStudent by remember { mutableStateOf(students.firstOrNull()) }
     var testTitle by remember { mutableStateOf("Unit Test 1") }
@@ -818,6 +932,7 @@ fun AddTestScoreDialog(
     var scoreText by remember { mutableStateOf("45") }
     var maxScoreText by remember { mutableStateOf("50") }
     var remarks by remember { mutableStateOf("Good attempt") }
+    var notifyParent by remember { mutableStateOf(true) }
     var studentDropdownExpanded by remember { mutableStateOf(false) }
 
     AlertDialog(
@@ -836,7 +951,7 @@ fun AddTestScoreDialog(
         },
         title = {
             Text(
-                "Record Test Score",
+                "Record Student Marks",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
@@ -848,33 +963,41 @@ fun AddTestScoreDialog(
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
             ) {
-                ExposedDropdownMenuBox(
-                    expanded = studentDropdownExpanded,
-                    onExpandedChange = { studentDropdownExpanded = !studentDropdownExpanded }
-                ) {
-                    OutlinedTextField(
-                        value = selectedStudent?.name ?: "Select Student",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Student") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = studentDropdownExpanded) },
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier
-                            .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                            .fillMaxWidth()
+                if (students.isEmpty()) {
+                    Text(
+                        text = "Please enroll a student first in Fees & Roster before recording test marks.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
                     )
-                    ExposedDropdownMenu(
+                } else {
+                    ExposedDropdownMenuBox(
                         expanded = studentDropdownExpanded,
-                        onDismissRequest = { studentDropdownExpanded = false }
+                        onExpandedChange = { studentDropdownExpanded = !studentDropdownExpanded }
                     ) {
-                        students.forEach { student ->
-                            DropdownMenuItem(
-                                text = { Text("${student.name} (${student.gradeClass})") },
-                                onClick = {
-                                    selectedStudent = student
-                                    studentDropdownExpanded = false
-                                }
-                            )
+                        OutlinedTextField(
+                            value = selectedStudent?.name ?: "Select Student",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Student") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = studentDropdownExpanded) },
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = studentDropdownExpanded,
+                            onDismissRequest = { studentDropdownExpanded = false }
+                        ) {
+                            students.forEach { student ->
+                                DropdownMenuItem(
+                                    text = { Text("${student.name} (${student.gradeClass})") },
+                                    onClick = {
+                                        selectedStudent = student
+                                        studentDropdownExpanded = false
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -921,6 +1044,26 @@ fun AddTestScoreDialog(
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Send to Parent Portal",
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Switch(
+                        checked = notifyParent,
+                        onCheckedChange = { notifyParent = it }
+                    )
+                }
             }
         },
         confirmButton = {
@@ -929,13 +1072,13 @@ fun AddTestScoreDialog(
                     selectedStudent?.let { student ->
                         val scoreVal = scoreText.toDoubleOrNull() ?: 0.0
                         val maxScoreVal = maxScoreText.toDoubleOrNull() ?: 100.0
-                        onConfirm(student, testTitle, subject, scoreVal, maxScoreVal, remarks)
+                        onConfirm(student, testTitle, subject, scoreVal, maxScoreVal, remarks, notifyParent)
                     }
                 },
                 enabled = selectedStudent != null && testTitle.isNotBlank(),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Save Score")
+                Text(if (notifyParent) "Save & Send" else "Save Marks")
             }
         },
         dismissButton = {

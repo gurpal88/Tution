@@ -7,8 +7,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.animation.*
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,11 +26,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -35,10 +42,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.FeeStatus
 import com.example.data.Student
 import com.example.ui.screens.*
-import com.example.ui.theme.EmeraldAccent
+import com.example.ui.theme.SapphireDeep
 import com.example.ui.theme.SapphirePrimary
 import com.example.ui.theme.TuitionManagerTheme
 import com.example.ui.viewmodel.TuitionViewModel
+import kotlinx.coroutines.delay
 
 enum class NavigationTab(
     val title: String,
@@ -49,7 +57,7 @@ enum class NavigationTab(
     DASHBOARD("Dashboard", "Home", Icons.Filled.Dashboard, Icons.Outlined.Dashboard),
     STUDENTS_FEE("Fees & Roster", "Fees", Icons.Filled.People, Icons.Outlined.People),
     MESSAGES("Messages", "Messages", Icons.AutoMirrored.Filled.Chat, Icons.AutoMirrored.Outlined.Chat),
-    ATTENDANCE_TASKS("Attendance & Tasks", "Classes", Icons.AutoMirrored.Filled.Assignment, Icons.AutoMirrored.Outlined.Assignment),
+    ATTENDANCE_TASKS("Attendance & Academics", "Classes", Icons.AutoMirrored.Filled.Assignment, Icons.AutoMirrored.Outlined.Assignment),
     EXPENSES("Expenses", "Ledger", Icons.Filled.AccountBalanceWallet, Icons.Outlined.AccountBalanceWallet)
 }
 
@@ -63,8 +71,99 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             TuitionManagerTheme {
-                TuitionAppContent(viewModel = viewModel)
+                var showLoadingPage by remember { mutableStateOf(true) }
+
+                LaunchedEffect(Unit) {
+                    delay(1000)
+                    showLoadingPage = false
+                }
+
+                AnimatedContent(
+                    targetState = showLoadingPage,
+                    transitionSpec = {
+                        fadeIn(tween(260)) togetherWith fadeOut(tween(260))
+                    },
+                    label = "appLoadingTransition"
+                ) { isLoading ->
+                    if (isLoading) {
+                        TuitionLoadingPage()
+                    } else {
+                        TuitionAppContent(viewModel = viewModel)
+                    }
+                }
             }
+        }
+    }
+}
+
+@Composable
+fun TuitionLoadingPage() {
+    val scale = remember { Animatable(0.88f) }
+
+    LaunchedEffect(Unit) {
+        scale.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
+        )
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(SapphireDeep, SapphirePrimary, Color(0xFF1662B6))
+                )
+            )
+            .windowInsetsPadding(WindowInsets.safeDrawing),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                shadowElevation = 12.dp,
+                border = BorderStroke(2.dp, Color.White.copy(alpha = 0.28f)),
+                modifier = Modifier
+                    .size(124.dp)
+                    .scale(scale.value)
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.tuition_manager_icon_1795602876053),
+                    contentDescription = "Tuition Manager Logo",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = "Tuition Manager",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    text = "Learn • Grow • Excel",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color(0xFFFDE68A)
+                )
+            }
+
+            LinearProgressIndicator(
+                color = Color(0xFF99F6E4),
+                trackColor = Color.White.copy(alpha = 0.2f),
+                modifier = Modifier
+                    .width(140.dp)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(50))
+            )
         }
     }
 }
@@ -74,6 +173,7 @@ class MainActivity : ComponentActivity() {
 fun TuitionAppContent(viewModel: TuitionViewModel) {
     val context = LocalContext.current
     var currentTab by remember { mutableStateOf(NavigationTab.DASHBOARD) }
+    var attendanceSubTab by remember { mutableIntStateOf(0) }
     var initialFeeStudentUpdate by remember { mutableStateOf<Student?>(null) }
 
     val allStudents by viewModel.allStudents.collectAsStateWithLifecycle()
@@ -93,7 +193,6 @@ fun TuitionAppContent(viewModel: TuitionViewModel) {
     val isTutorView by viewModel.isTutorView.collectAsStateWithLifecycle()
     val selectedParentStudent by viewModel.selectedParentStudent.collectAsStateWithLifecycle()
 
-    // Handle back press gracefully across perspective & secondary tabs
     BackHandler(enabled = !isTutorView || currentTab != NavigationTab.DASHBOARD) {
         if (!isTutorView) {
             viewModel.togglePerspective()
@@ -115,29 +214,14 @@ fun TuitionAppContent(viewModel: TuitionViewModel) {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = Color.Transparent,
-                                    modifier = Modifier.size(40.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(
-                                                Brush.linearGradient(
-                                                    listOf(SapphirePrimary, EmeraldAccent)
-                                                )
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.School,
-                                            contentDescription = null,
-                                            tint = Color.White,
-                                            modifier = Modifier.size(22.dp)
-                                        )
-                                    }
-                                }
+                                Image(
+                                    painter = painterResource(id = R.drawable.tuition_manager_icon_1795602876053),
+                                    contentDescription = "Tuition Manager",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                )
                                 Column {
                                     Text(
                                         text = "Tuition Manager",
@@ -317,8 +401,14 @@ fun TuitionAppContent(viewModel: TuitionViewModel) {
                                             currentTab = NavigationTab.STUDENTS_FEE
                                         },
                                         onNavigateToMessages = { currentTab = NavigationTab.MESSAGES },
-                                        onNavigateToAttendance = { currentTab = NavigationTab.ATTENDANCE_TASKS },
-                                        onNavigateToTasks = { currentTab = NavigationTab.ATTENDANCE_TASKS },
+                                        onNavigateToAttendance = {
+                                            attendanceSubTab = 0
+                                            currentTab = NavigationTab.ATTENDANCE_TASKS
+                                        },
+                                        onNavigateToAcademicRecords = {
+                                            attendanceSubTab = 2
+                                            currentTab = NavigationTab.ATTENDANCE_TASKS
+                                        },
                                         onQuickAddStudent = { currentTab = NavigationTab.STUDENTS_FEE },
                                         onQuickUpdateFee = { student ->
                                             initialFeeStudentUpdate = student
@@ -395,9 +485,25 @@ fun TuitionAppContent(viewModel: TuitionViewModel) {
                                             viewModel.deleteTask(task)
                                         },
                                         testScores = testScores,
-                                        onAddTestScore = { student, title, subject, score, maxScore, remarks ->
-                                            viewModel.addTestScore(student, title, subject, score, maxScore, remarks)
-                                        }
+                                        onAddTestScore = { student, title, subject, score, maxScore, remarks, notifyParent ->
+                                            viewModel.addTestScore(student, title, subject, score, maxScore, remarks, notifyParent)
+                                        },
+                                        onSendMarksPortal = { score, student ->
+                                            viewModel.sendMarksToPortal(score, student)
+                                        },
+                                        onSendMarksWhatsApp = { ctx, phone, msg ->
+                                            viewModel.openWhatsApp(ctx, phone, msg)
+                                        },
+                                        onSendMarksSms = { ctx, phone, msg ->
+                                            viewModel.openSms(ctx, phone, msg)
+                                        },
+                                        onShareMarks = { ctx, score, student ->
+                                            viewModel.shareMarks(ctx, score, student)
+                                        },
+                                        formatMarksMessage = { score, student ->
+                                            viewModel.buildMarksReportText(score, student?.parentName)
+                                        },
+                                        initialSubTab = attendanceSubTab
                                     )
 
                                     NavigationTab.EXPENSES -> ExpensesScreen(
